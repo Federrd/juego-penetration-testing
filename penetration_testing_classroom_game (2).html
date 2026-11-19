@@ -1,0 +1,1800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tecnólogo en Ciberseguridad — Penetration Testing Challenge</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Orbitron:wght@600;700;900&display=swap');
+
+  :root {
+    --bg-dark: #05080a;
+    --panel-bg: rgba(10, 18, 24, 0.92);
+    --border-neon: #00ff41;
+    --cyan-neon: #00f3ff;
+    --purple-neon: #b829ff;
+    --red-alert: #ff2a55;
+    --amber-warn: #ffb800;
+    --text-main: #e2f1f8;
+    --text-dim: #7f9ba8;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    background-image: radial-gradient(circle at 50% 0%, rgba(0, 255, 65, 0.08) 0%, transparent 65%);
+  }
+
+  /* Subtle CRT Scanline Overlay */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.22) 50%);
+    background-size: 100% 4px;
+    z-index: 99;
+    pointer-events: none;
+  }
+
+  #matrix-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    opacity: 0.16;
+    pointer-events: none;
+  }
+
+  .app-container {
+    position: relative;
+    z-index: 1;
+    max-width: 1220px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px 24px 32px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Top HUD Bar */
+  .top-hud {
+    display: grid;
+    grid-template-columns: 1.2fr 1.6fr 1.2fr;
+    align-items: center;
+    gap: 14px;
+    background: var(--panel-bg);
+    border: 1px solid rgba(0, 255, 65, 0.45);
+    box-shadow: 0 0 25px rgba(0, 255, 65, 0.14), inset 0 0 15px rgba(0, 255, 65, 0.05);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(6px);
+  }
+
+  .brand-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--border-neon);
+    box-shadow: 0 0 10px var(--border-neon);
+    animation: pulse 1.5s infinite;
+  }
+
+  .brand-title {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 1px;
+    color: var(--border-neon);
+    text-transform: uppercase;
+  }
+
+  .scoreboard {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .team-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    transition: all 0.25s ease;
+    min-width: 0;
+  }
+
+  .faction-badge {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .team-card.alpha.active-turn {
+    border-color: var(--cyan-neon);
+    box-shadow: 0 0 16px rgba(0, 243, 255, 0.45);
+    background: rgba(0, 243, 255, 0.12);
+  }
+
+  .team-card.bravo.active-turn {
+    border-color: var(--red-alert);
+    box-shadow: 0 0 16px rgba(255, 42, 85, 0.45);
+    background: rgba(255, 42, 85, 0.14);
+  }
+
+  .team-name {
+    font-weight: 800;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+  }
+
+  .alpha .team-name { color: var(--cyan-neon); }
+  .bravo .team-name { color: var(--red-alert); }
+
+  .team-score {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    min-width: 28px;
+    text-align: center;
+  }
+
+  .score-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .mini-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--text-main);
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .mini-btn:hover {
+    background: rgba(0, 255, 65, 0.25);
+    border-color: var(--border-neon);
+  }
+
+  .controls-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .hud-btn {
+    background: rgba(0, 255, 65, 0.08);
+    border: 1px solid rgba(0, 255, 65, 0.4);
+    color: var(--border-neon);
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .hud-btn:hover {
+    background: rgba(0, 255, 65, 0.22);
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+  }
+
+  .hud-btn.es-active {
+    background: rgba(255, 184, 0, 0.2);
+    border-color: var(--amber-warn);
+    color: var(--amber-warn);
+  }
+
+  /* Turn Banner */
+  .turn-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-bg);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    border-radius: 8px;
+    padding: 10px 20px;
+    margin-bottom: 18px;
+  }
+
+  .round-tag {
+    font-size: 0.9rem;
+    color: var(--border-neon);
+    font-weight: 700;
+  }
+
+  .turn-indicator {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 900;
+    padding: 6px 18px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .turn-indicator.alpha-turn {
+    color: #031318;
+    background: var(--cyan-neon);
+    box-shadow: 0 0 18px rgba(0, 243, 255, 0.6);
+  }
+
+  .turn-indicator.bravo-turn {
+    color: #ffffff;
+    background: var(--red-alert);
+    box-shadow: 0 0 18px rgba(255, 42, 85, 0.6);
+  }
+
+  .timer-display {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--amber-warn);
+    min-width: 90px;
+    text-align: right;
+  }
+
+  /* Main Arena Panel */
+  .arena-panel {
+    background: var(--panel-bg);
+    border: 1px solid rgba(0, 255, 65, 0.45);
+    box-shadow: 0 0 35px rgba(0, 0, 0, 0.8), inset 0 0 25px rgba(0, 255, 65, 0.06);
+    border-radius: 12px;
+    padding: 28px 32px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    backdrop-filter: blur(6px);
+  }
+
+  .arena-panel::before,
+  .arena-panel::after {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-color: var(--cyan-neon);
+    border-style: solid;
+    pointer-events: none;
+  }
+
+  .arena-panel::before {
+    top: 10px;
+    left: 10px;
+    border-width: 2px 0 0 2px;
+  }
+
+  .arena-panel::after {
+    bottom: 10px;
+    right: 10px;
+    border-width: 0 2px 2px 0;
+  }
+
+  .start-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.6rem;
+    font-weight: 900;
+    color: var(--border-neon);
+    text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+  }
+
+  .start-subtitle {
+    font-size: 1.15rem;
+    color: var(--cyan-neon);
+    margin-bottom: 28px;
+  }
+
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    width: 100%;
+    max-width: 960px;
+    margin-bottom: 30px;
+  }
+
+  .module-card {
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(0, 255, 65, 0.35);
+    border-radius: 8px;
+    padding: 18px;
+    text-align: left;
+  }
+
+  .module-card h3 {
+    color: var(--border-neon);
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+
+  .module-card p {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+
+  .primary-btn {
+    background: var(--border-neon);
+    color: #031006;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 900;
+    padding: 14px 36px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 1.5px;
+    box-shadow: 0 0 22px rgba(0, 255, 65, 0.5);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 32px rgba(0, 255, 65, 0.8);
+  }
+
+  .prompt-label {
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+  }
+
+  .pixel-art-frame {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 14px;
+    background: #020806;
+    border: 2px solid rgba(0, 243, 255, 0.55);
+    box-shadow: 0 0 18px rgba(0, 243, 255, 0.22), inset 0 0 12px rgba(0, 255, 65, 0.12);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    image-rendering: pixelated;
+    position: relative;
+  }
+
+  .pixel-art-caption {
+    font-size: 0.65rem;
+    color: var(--cyan-neon);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    opacity: 0.8;
+  }
+
+  .pixel-art-frame svg {
+    width: 100%;
+    height: 100%;
+    shape-rendering: crispEdges;
+  }
+
+  .question-text {
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #ffffff;
+    max-width: 920px;
+    margin-bottom: 16px;
+  }
+
+  .es-box {
+    display: none;
+    background: rgba(255, 184, 0, 0.12);
+    border: 1px dashed var(--amber-warn);
+    color: var(--amber-warn);
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 0.98rem;
+    margin-bottom: 22px;
+    max-width: 860px;
+  }
+
+  body.show-es .es-box {
+    display: block;
+  }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+    width: 100%;
+    max-width: 880px;
+    margin-top: 10px;
+  }
+
+  .option-btn {
+    background: rgba(15, 28, 38, 0.9);
+    border: 2px solid rgba(0, 243, 255, 0.45);
+    color: var(--text-main);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    padding: 22px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .option-btn:hover:not(:disabled) {
+    border-color: var(--border-neon);
+    background: rgba(0, 255, 65, 0.14);
+    transform: translateY(-2px);
+  }
+
+  .option-btn.correct {
+    background: rgba(0, 255, 65, 0.25);
+    border-color: var(--border-neon);
+    color: var(--border-neon);
+    box-shadow: 0 0 24px rgba(0, 255, 65, 0.5);
+  }
+
+  .option-btn.wrong {
+    background: rgba(255, 42, 85, 0.25);
+    border-color: var(--red-alert);
+    color: var(--red-alert);
+    box-shadow: 0 0 24px rgba(255, 42, 85, 0.45);
+  }
+
+  .option-btn:disabled {
+    cursor: default;
+  }
+
+  .feedback-panel {
+    margin-top: 24px;
+    padding: 18px 24px;
+    border-radius: 8px;
+    max-width: 860px;
+    width: 100%;
+    display: none;
+  }
+
+  .feedback-panel.granted {
+    display: block;
+    background: rgba(0, 255, 65, 0.1);
+    border: 1px solid var(--border-neon);
+  }
+
+  .feedback-panel.denied {
+    display: block;
+    background: rgba(255, 42, 85, 0.1);
+    border: 1px solid var(--red-alert);
+  }
+
+  .feedback-status {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 900;
+    margin-bottom: 6px;
+  }
+
+  .granted .feedback-status { color: var(--border-neon); }
+  .denied .feedback-status { color: var(--red-alert); }
+
+  .feedback-exp {
+    font-size: 1rem;
+    color: var(--text-main);
+    margin-bottom: 12px;
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  .steal-btn {
+    background: rgba(255, 184, 0, 0.2);
+    border: 1px solid var(--amber-warn);
+    color: var(--amber-warn);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    padding: 10px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .steal-btn:hover {
+    background: rgba(255, 184, 0, 0.35);
+  }
+
+  .round-nav {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* Victory Mini Hacker Animation (8-bit Pixel Art) */
+  .victory-hacker-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 4px auto 16px;
+    position: relative;
+  }
+
+  .victory-hacker-sprite {
+    width: 112px;
+    height: 112px;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 0 12px rgba(0, 243, 255, 0.55));
+    animation: hackerBounce 0.45s ease-in-out infinite alternate;
+  }
+
+  .victory-hacker-sprite svg {
+    width: 100%;
+    height: 100%;
+    shape-rendering: crispEdges;
+    display: block;
+  }
+
+  .victory-hacker-shadow {
+    width: 64px;
+    height: 8px;
+    background: radial-gradient(ellipse at center, rgba(0, 243, 255, 0.45) 0%, transparent 72%);
+    margin-top: -4px;
+    animation: shadowPulse 0.45s ease-in-out infinite alternate;
+  }
+
+  @keyframes hackerBounce {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(-5px); }
+  }
+
+  @keyframes shadowPulse {
+    0% { transform: scaleX(1); opacity: 0.75; }
+    100% { transform: scaleX(0.82); opacity: 0.4; }
+  }
+
+  .nav-chip {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .nav-chip.active {
+    border-color: var(--border-neon);
+    color: var(--border-neon);
+    background: rgba(0, 255, 65, 0.12);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  @media (max-width: 860px) {
+    .app-container {
+      padding: 10px 12px 24px;
+    }
+    .top-hud {
+      grid-template-columns: 1fr;
+      text-align: center;
+      padding: 10px 12px;
+      gap: 10px;
+    }
+    .brand-box, .controls-bar {
+      justify-content: center;
+    }
+    .brand-title {
+      font-size: 0.88rem;
+    }
+    .scoreboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .team-card {
+      padding: 6px 8px;
+      gap: 4px;
+      justify-content: center;
+    }
+    .faction-badge {
+      width: 18px;
+      height: 18px;
+    }
+    .faction-badge svg {
+      width: 18px;
+      height: 18px;
+    }
+    .team-name {
+      font-size: 0.72rem;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+    .team-score {
+      font-size: 1.15rem;
+      min-width: 22px;
+    }
+    .mini-btn {
+      padding: 2px 5px;
+      font-size: 0.65rem;
+    }
+    .turn-bar {
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .turn-indicator {
+      font-size: 0.95rem;
+      padding: 5px 12px;
+    }
+    .timer-display {
+      text-align: center;
+    }
+    .arena-panel {
+      padding: 20px 14px;
+    }
+    .start-title {
+      font-size: 1.65rem;
+    }
+    .modules-grid {
+      grid-template-columns: 1fr;
+    }
+    .question-text {
+      font-size: 1.25rem;
+    }
+    .options-grid {
+      grid-template-columns: 1fr;
+    }
+    .option-btn {
+      font-size: 1.05rem;
+      padding: 16px 14px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix-canvas"></canvas>
+
+<div class="app-container">
+  <!-- TOP HUD -->
+  <header class="top-hud">
+    <div class="brand-box">
+      <div class="brand-dot"></div>
+      <div class="brand-title">Tecnólogo en Ciberseguridad</div>
+    </div>
+
+    <div class="scoreboard">
+      <div class="team-card alpha" id="card-alpha">
+        <span class="faction-badge">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#00f3ff" stroke-width="2">
+            <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/>
+            <polygon points="12,6 13.8,10.2 18.4,10.6 14.9,13.6 16,18 12,15.6 8,18 9.1,13.6 5.6,10.6 10.2,10.2" fill="#00f3ff"/>
+          </svg>
+        </span>
+        <span class="team-name">S.H.I.E.L.D.</span>
+        <span class="team-score" id="score-alpha">0</span>
+        <div class="score-btns">
+          <button class="mini-btn" onclick="adjustScore('alpha', 1)">+1</button>
+          <button class="mini-btn" onclick="adjustScore('alpha', -1)">-1</button>
+        </div>
+      </div>
+
+      <div class="team-card bravo" id="card-bravo">
+        <span class="faction-badge">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ff2a55" stroke-width="2">
+            <circle cx="12" cy="9" r="5" fill="rgba(255,42,85,0.25)"/>
+            <path d="M7 13c-2 2-3 5-2 8M10 14c-1 3-1 6 0 8M14 14c1 3 1 6 0 8M17 13c2 2 3 5 2 8" stroke-linecap="round"/>
+            <circle cx="10" cy="8.5" r="1" fill="#ff2a55"/>
+            <circle cx="14" cy="8.5" r="1" fill="#ff2a55"/>
+          </svg>
+        </span>
+        <span class="team-name">HYDRA</span>
+        <span class="team-score" id="score-bravo">0</span>
+        <div class="score-btns">
+          <button class="mini-btn" onclick="adjustScore('bravo', 1)">+1</button>
+          <button class="mini-btn" onclick="adjustScore('bravo', -1)">-1</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <button class="hud-btn" id="btn-es" onclick="toggleEs()">🇪🇸 GUÍA ES: OFF</button>
+      <button class="hud-btn" id="btn-timer" onclick="toggleTimer()">⏱ TIMER: OFF</button>
+      <button class="hud-btn" id="btn-sound" onclick="toggleSound()">🔊 SFX: ON</button>
+      <button class="hud-btn" onclick="shuffleCurrentRound()" title="Mezclar manteniendo 4 por equipo">🔀</button>
+    </div>
+  </header>
+
+  <!-- TURN & ROUND BANNER -->
+  <div class="turn-bar" id="turn-bar" style="display:none;">
+    <div class="round-tag" id="round-label">MODULE 01 // Q 1/8</div>
+    <div class="turn-indicator alpha-turn" id="turn-badge">TURN: S.H.I.E.L.D. (1/4)</div>
+    <div class="timer-display" id="timer-box">--</div>
+  </div>
+
+  <!-- MAIN ARENA -->
+  <main class="arena-panel" id="arena"></main>
+
+  <!-- QUICK ROUND JUMP -->
+  <footer class="round-nav">
+    <button class="nav-chip active" id="chip-start" onclick="showStart()">START</button>
+    <button class="nav-chip" id="chip-0" onclick="startRound(0)">ROUND 1: HACKER / DEFENDER</button>
+    <button class="nav-chip" id="chip-1" onclick="startRound(1)">ROUND 2: BOX METHODS</button>
+    <button class="nav-chip" id="chip-2" onclick="startRound(2)">ROUND 3: METHOD / TOOL</button>
+    <button class="nav-chip" id="chip-end" onclick="showFinal()">PODIUM</button>
+  </footer>
+</div>
+
+<script>
+  // Matrix Background Animation
+  const canvas = document.getElementById('matrix-canvas');
+  const ctx = canvas.getContext('2d');
+  let columns = 0;
+  let drops = [];
+  const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%&*<>[]{}';
+  const fontSize = 14;
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    columns = Math.floor(canvas.width / fontSize);
+    drops = Array(columns).fill(1);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function startMatrix() {
+    resizeCanvas();
+    setInterval(() => {
+      ctx.fillStyle = 'rgba(5, 8, 10, 0.08)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00ff41';
+      ctx.font = fontSize + 'px monospace';
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    }, 55);
+  }
+
+  // Web Audio Synthesizer
+  let soundOn = true;
+  let audioCtx = null;
+
+  function playTone(type) {
+    if (!soundOn) return;
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+
+      if (type === 'ok') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(783.99, now + 0.12);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } else if (type === 'fail') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(190, now);
+        osc.frequency.setValueAtTime(135, now + 0.15);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      } else {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(620, now);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      }
+    } catch (e) {
+      // Ignore audio errors if blocked by browser autoplay policy
+    }
+  }
+
+  function getTurnInfo(qIndex) {
+    const isAlpha = (qIndex % 2 === 0);
+    const team = isAlpha ? 'alpha' : 'bravo';
+    const label = isAlpha ? 'S.H.I.E.L.D.' : 'HYDRA';
+    const turnNum = Math.floor(qIndex / 2) + 1;
+    return { team, label, turnNum };
+  }
+
+  // Crisp, Neutral 8-Bit Pixel Art SVG Generator (16x16 shaded multi-color palette - no answer spoilers!)
+  const PIXEL_ICONS = {
+    terminal: {
+      label: "SYS_TERMINAL // 0x01",
+      palette: {
+        G: '#00ff41', L: '#8aff9e', S: '#008f24',
+        C: '#00f3ff', B: '#007791', D: '#051410', K: '#0d2b22'
+      },
+      grid: [
+        '.LLLLLLLLLLLLLL.',
+        'LGGGGGGGGGGGGGGS',
+        'GDCCCCCCCCCCCCDS',
+        'GDKKKKKKKKKKKKDS',
+        'GDLL.KKKKKKKKKDS',
+        'GDKLL.GGGGGGKKDS',
+        'GDLL.KKKKKKKKKDS',
+        'GDKKKKKKKKKKKKDS',
+        'GDCC.CCCCCCKKKDS',
+        'GDKKKKKKKKKKKKDS',
+        'GDGG.LLLLKKKKKDS',
+        'GDKKKKKKKKKKKKDS',
+        '.SSSSSSSSSSSSSS.',
+        '......BSSB......',
+        '....CCGGGGCC....',
+        '................'
+      ]
+    },
+    shield_node: {
+      label: "SEC_CORE // 0x02",
+      palette: {
+        G: '#00ff41', L: '#9effb3', S: '#008a22',
+        C: '#00f3ff', W: '#b8fbff', B: '#006e85', D: '#061820'
+      },
+      grid: [
+        '...WWWWWWWWWW...',
+        '..WCCCCCCCCCCB..',
+        '.WCDDDDGGDDDDCB.',
+        '.WCDDDGLLGDDDCB.',
+        '.WCDDGLLLLGDDCS.',
+        '.WCDDDGLLGDDDCS.',
+        '.BCDDDDGGDDDDBS.',
+        '..BCDDDDDDDDBS..',
+        '...BCDDDDDDBS...',
+        '....BCDDDDBS....',
+        '.....BCCDCS.....',
+        '......BCCS......',
+        '................',
+        '....G.L..L.G....',
+        '................',
+        '................'
+      ]
+    },
+    network_mesh: {
+      label: "NET_TOPOLOGY // 0x03",
+      palette: {
+        G: '#00ff41', L: '#9effb3', S: '#007d1e',
+        C: '#00f3ff', W: '#b8fbff', B: '#006e85', D: '#071b18'
+      },
+      grid: [
+        '..WWWW....WWWW..',
+        '.WDDDDB..WDDDDB.',
+        '..BBBB....BBBB..',
+        '....CC....CC....',
+        '.....CC..CC.....',
+        '......LLLL......',
+        '.....LGDDGS.....',
+        '......SSSS......',
+        '.....CC..CC.....',
+        '....CC....CC....',
+        '..WWWW....WWWW..',
+        '.WDDDDB..WDDDDB.',
+        '..BBBB....BBBB..',
+        '................',
+        '................',
+        '................'
+      ]
+    },
+    cipher_key: {
+      label: "CRYPTO_KEY // 0x04",
+      palette: {
+        G: '#00ff41', L: '#9effb3', S: '#007d1e',
+        C: '#00f3ff', W: '#b8fbff', B: '#006e85', D: '#071b18'
+      },
+      grid: [
+        '................',
+        '................',
+        '....WWWWWW......',
+        '...WCDDDDCB.....',
+        '..WCDDDDDDCB....',
+        '..BCDDDDDDBS....',
+        '...BCDDDDBS.....',
+        '....BBBBBB......',
+        '......LG........',
+        '......LGGS......',
+        '......LG........',
+        '......LGGGS.....',
+        '......SG........',
+        '................',
+        '................',
+        '................'
+      ]
+    },
+    satellite: {
+      label: "UPLINK_SAT // 0x05",
+      palette: {
+        G: '#00ff41', L: '#9effb3', S: '#007d1e',
+        C: '#00f3ff', W: '#b8fbff', B: '#006e85', D: '#061822'
+      },
+      grid: [
+        '..........WWW...',
+        '.........WC.CB..',
+        '........WC...CB.',
+        '......LLLL......',
+        '....LLLDDGGS....',
+        '...LLDDDDDDGS...',
+        '....GGGDDSSS....',
+        '......SSSS......',
+        '..WC...CB.......',
+        '.WC.CB..CB......',
+        'WCB..CB.........',
+        '......LG........',
+        '.....LGGS.......',
+        '....LGGGGS......',
+        '................',
+        '................'
+      ]
+    },
+    data_chip: {
+      label: "CPU_MODULE // 0x06",
+      palette: {
+        G: '#00ff41', L: '#9effb3', S: '#007d1e',
+        C: '#00f3ff', W: '#b8fbff', B: '#006e85', D: '#061814'
+      },
+      grid: [
+        '....L..L..L.....',
+        '...WWWWWWWWWW...',
+        '..WDDDDDDDDDDB..',
+        '.LWDDDGGGGDDDBS.',
+        '..WDDGLLLLGDDB..',
+        '.LWDDGLDDLGDDGS.',
+        '..WDDGLLLLGDDB..',
+        '.SWDDDGGGGDDDBS.',
+        '..BDDDDDDDDDBS..',
+        '...BBBBBBBBBB...',
+        '....S..S..S.....',
+        '................',
+        '................',
+        '................',
+        '................',
+        '................'
+      ]
+    },
+    packet_wave: {
+      label: "SIGNAL_SCAN // 0x07",
+      palette: {
+        G: '#00ff41', L: '#9effb3', S: '#007d1e',
+        C: '#00f3ff', W: '#b8fbff', B: '#006e85'
+      },
+      grid: [
+        '................',
+        '.......LL.......',
+        '......L..G......',
+        '.....L....G.....',
+        '....L......S....',
+        'WWCCCCCCCCCCCCBB',
+        '....L......S....',
+        '.....G....S.....',
+        '......G..S......',
+        '.......SS.......',
+        '................',
+        '..WC..WC..CB..CB',
+        '................',
+        '................',
+        '................',
+        '................'
+      ]
+    },
+    firewall_grid: {
+      label: "FIREWALL // 0x08",
+      palette: {
+        G: '#00ff41', L: '#9effb3', S: '#007d1e',
+        C: '#00f3ff', W: '#b8fbff', B: '#006e85', D: '#071b18'
+      },
+      grid: [
+        '.LLLLLL..LLLLLL.',
+        'LDDDDDDGLDDDDDDS',
+        '.SSSSSS..SSSSSS.',
+        '....LLLLLLLL....',
+        '...GDDDDDDDDS...',
+        '....SSSSSSSS....',
+        '.WWWWWW..WWWWWW.',
+        'WDDDDDDCWDDDDDDB',
+        '.BBBBBB..BBBBBB.',
+        '....WWWWWWWW....',
+        '...CDDDDDDDDB...',
+        '....BBBBBBBB....',
+        '................',
+        '................',
+        '................',
+        '................'
+      ]
+    }
+  };
+
+  function getPixelArtHTML(iconKey) {
+    const item = PIXEL_ICONS[iconKey] || PIXEL_ICONS.terminal;
+    let rects = '';
+    for (let y = 0; y < 16; y++) {
+      const row = item.grid[y] || '';
+      for (let x = 0; x < 16; x++) {
+        const ch = row.charAt(x);
+        if (ch && ch !== '.' && item.palette[ch]) {
+          rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + item.palette[ch] + '"/>';
+        }
+      }
+    }
+    return '<div class="pixel-art-frame"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">' + rects + '</svg></div><div class="pixel-art-caption">[ ' + item.label + ' ]</div>';
+  }
+
+  // Game Data: 3 Rounds x 8 Questions (4 S.H.I.E.L.D., 4 HYDRA) with neutral cyber-themed 8-bit icons
+  const ROUNDS = [
+    {
+      title: "ROUND 1 // HACKER OR DEFENDER?",
+      prompt: "Read the scenario. Is this a malicious Hacker or an authorized Defender?",
+      options: ["Hacker!", "Defender!"],
+      questions: [
+        {
+          icon: "shield_node",
+          q: "A person tests a company's network with written permission.",
+          es: "Una persona prueba la red de una empresa con permiso por escrito.",
+          answer: "Defender!",
+          exp: "Written permission is the golden rule of ethical penetration testing.",
+          expEs: "El permiso por escrito es la regla de oro del pentesting ético."
+        },
+        {
+          icon: "cipher_key",
+          q: "A tester checks for weak passwords with full authorization.",
+          es: "Un tester busca contraseñas débiles con autorización completa.",
+          answer: "Defender!",
+          exp: "Finding weak passwords with authorization helps protect user accounts.",
+          expEs: "Detectar contraseñas débiles con autorización ayuda a proteger las cuentas."
+        },
+        {
+          icon: "data_chip",
+          q: "A person steals private information without permission.",
+          es: "Una persona roba información privada sin permiso.",
+          answer: "Hacker!",
+          exp: "Accessing or stealing data without authorization is illegal.",
+          expEs: "Acceder o robar datos sin autorización es ilegal."
+        },
+        {
+          icon: "packet_wave",
+          q: "A security specialist runs an Nmap scan after signing a contract.",
+          es: "Un especialista en seguridad ejecuta un escaneo Nmap tras firmar contrato.",
+          answer: "Defender!",
+          exp: "Scanning open ports under contract belongs to Phase 3 (Scan).",
+          expEs: "Escanear puertos abiertos bajo contrato pertenece a la Fase 3 (Scan)."
+        },
+        {
+          icon: "network_mesh",
+          q: "Someone attacks a website to stop its service.",
+          es: "Alguien ataca un sitio web para detener su servicio.",
+          answer: "Hacker!",
+          exp: "Stopping a service (DoS) causes damage instead of helping.",
+          expEs: "Detener un servicio (DoS) causa daño en lugar de ayudar."
+        },
+        {
+          icon: "satellite",
+          q: "Someone sends fake phishing emails to steal employee passwords without permission.",
+          es: "Alguien envía correos phishing falsos para robar claves sin permiso.",
+          answer: "Hacker!",
+          exp: "Unauthorized credential theft is a malicious attack.",
+          expEs: "El robo de credenciales sin autorización es un ataque malicioso."
+        },
+        {
+          icon: "terminal",
+          q: "A tester writes a report with recommendations to fix a SQL injection bug.",
+          es: "Un tester escribe un reporte con recomendaciones para arreglar una falla SQL injection.",
+          answer: "Defender!",
+          exp: "Delivering a clear report with solutions is Phase 5 of a pentest.",
+          expEs: "Entregar un reporte claro con soluciones es la Fase 5 de un pentest."
+        },
+        {
+          icon: "firewall_grid",
+          q: "Someone changes private data on a school server without authorization.",
+          es: "Alguien modifica datos privados en un servidor escolar sin autorización.",
+          answer: "Hacker!",
+          exp: "Modifying data without permission violates ethics and law.",
+          expEs: "Modificar datos sin permiso viola la ética y la ley."
+        }
+      ]
+    },
+    {
+      title: "ROUND 2 // BLACK, WHITE, OR GREY BOX?",
+      prompt: "Identify the penetration testing approach based on the tester's information:",
+      options: ["Black Box", "White Box", "Grey Box"],
+      questions: [
+        {
+          icon: "network_mesh",
+          q: "The tester has no information about the company's system.",
+          es: "El tester no tiene ninguna información sobre el sistema de la empresa.",
+          answer: "Black Box",
+          exp: "Black Box simulates an external attacker with zero prior knowledge.",
+          expEs: "Black Box simula un atacante externo sin conocimiento previo."
+        },
+        {
+          icon: "data_chip",
+          q: "The tester has access to technical documents, diagrams and user accounts.",
+          es: "El tester tiene acceso a documentos técnicos, diagramas y cuentas de usuario.",
+          answer: "White Box",
+          exp: "White Box gives full internal visibility to test in deep detail.",
+          expEs: "White Box da visibilidad interna total para probar en detalle."
+        },
+        {
+          icon: "firewall_grid",
+          q: "The company shares full network maps and administrator credentials.",
+          es: "La empresa comparte mapas completos de red y credenciales de administrador.",
+          answer: "White Box",
+          exp: "Full architecture and admin access define a White Box test.",
+          expEs: "Arquitectura completa y acceso admin definen una prueba White Box."
+        },
+        {
+          icon: "cipher_key",
+          q: "The tester has a normal user account, but does not know everything about the system.",
+          es: "El tester tiene una cuenta de usuario normal, pero no conoce todo el sistema.",
+          answer: "Grey Box",
+          exp: "Grey Box combines partial information with external testing.",
+          expEs: "Grey Box combina información parcial con pruebas externas."
+        },
+        {
+          icon: "satellite",
+          q: "The tester acts like an outside attacker and only knows the public website URL.",
+          es: "El tester actúa como atacante externo y solo conoce la URL pública del sitio.",
+          answer: "Black Box",
+          exp: "Starting only from public information is a classic Black Box test.",
+          expEs: "Empezar solo con información pública es una prueba Black Box clásica."
+        },
+        {
+          icon: "packet_wave",
+          q: "The tester receives a list of internal IP addresses, but no source code or diagrams.",
+          es: "El tester recibe una lista de IPs internas, pero sin código fuente ni diagramas.",
+          answer: "Grey Box",
+          exp: "Having partial internal clues without full diagrams is Grey Box.",
+          expEs: "Tener pistas internas parciales sin diagramas completos es Grey Box."
+        },
+        {
+          icon: "terminal",
+          q: "The tester can inspect the server configuration and source code before testing.",
+          es: "El tester puede revisar la configuración del servidor y el código fuente antes de probar.",
+          answer: "White Box",
+          exp: "Inspecting source code and configs is White Box testing.",
+          expEs: "Inspeccionar código fuente y configuraciones es White Box."
+        },
+        {
+          icon: "shield_node",
+          q: "The tester logs in as a basic customer to check if they can reach admin pages.",
+          es: "El tester entra como cliente básico para ver si puede acceder a páginas de administrador.",
+          answer: "Grey Box",
+          exp: "Testing privilege escalation from a normal account is Grey Box.",
+          expEs: "Probar escalada de privilegios desde una cuenta normal es Grey Box."
+        }
+      ]
+    },
+    {
+      title: "ROUND 3 // METHOD OR TOOL?",
+      prompt: "Quick Fire! Is this item a testing METHOD or a technical TOOL?",
+      options: ["Method", "Tool"],
+      questions: [
+        {
+          icon: "shield_node",
+          q: "Is BLACK BOX a method or a tool?",
+          es: "¿BLACK BOX es un método (Method) o una herramienta (Tool)?",
+          answer: "Method",
+          exp: "Black Box is a penetration testing method/approach.",
+          expEs: "Black Box es un método/enfoque de prueba de penetración."
+        },
+        {
+          icon: "packet_wave",
+          q: "Is NMAP a method or a tool?",
+          es: "¿NMAP es un método (Method) o una herramienta (Tool)?",
+          answer: "Tool",
+          exp: "Nmap is a popular network scanning tool.",
+          expEs: "Nmap es una herramienta popular de escaneo de redes."
+        },
+        {
+          icon: "firewall_grid",
+          q: "Is BURP SUITE a method or a tool?",
+          es: "¿BURP SUITE es un método (Method) o una herramienta (Tool)?",
+          answer: "Tool",
+          exp: "Burp Suite is a tool used to test web application traffic.",
+          expEs: "Burp Suite es una herramienta usada para analizar tráfico web."
+        },
+        {
+          icon: "satellite",
+          q: "Is WIRELESS TESTING a method or a tool?",
+          es: "¿WIRELESS TESTING es un método (Method) o una herramienta (Tool)?",
+          answer: "Method",
+          exp: "Wireless testing is a method focused on Wi-Fi security.",
+          expEs: "Wireless testing es un método enfocado en seguridad Wi-Fi."
+        },
+        {
+          icon: "cipher_key",
+          q: "Is SOCIAL ENGINEERING a method or a tool?",
+          es: "¿SOCIAL ENGINEERING es un método (Method) o una herramienta (Tool)?",
+          answer: "Method",
+          exp: "Social engineering tests human awareness (e.g., phishing simulation).",
+          expEs: "La ingeniería social evalúa el factor humano (ej. simulación de phishing)."
+        },
+        {
+          icon: "network_mesh",
+          q: "Is WIRESHARK a method or a tool?",
+          es: "¿WIRESHARK es un método (Method) o una herramienta (Tool)?",
+          answer: "Tool",
+          exp: "Wireshark is a network protocol analyzer tool.",
+          expEs: "Wireshark es una herramienta analizadora de paquetes de red."
+        },
+        {
+          icon: "data_chip",
+          q: "Is WEB APPLICATION TESTING a method or a tool?",
+          es: "¿WEB APPLICATION TESTING es un método (Method) o una herramienta (Tool)?",
+          answer: "Method",
+          exp: "Web application testing is a method for checking websites.",
+          expEs: "Web application testing es un método para auditar sitios web."
+        },
+        {
+          icon: "terminal",
+          q: "Is a PORT SCANNER PROGRAM a method or a tool?",
+          es: "¿Un PROGRAMA ESCÁNER DE PUERTOS es un método o una herramienta?",
+          answer: "Tool",
+          exp: "Software used to discover open ports is a technical tool.",
+          expEs: "El software usado para descubrir puertos abiertos es una herramienta."
+        }
+      ]
+    }
+  ];
+
+  let scores = { alpha: 0, bravo: 0 };
+  let currentRound = 0;
+  let currentQ = 0;
+  let answered = false;
+  let timerEnabled = false;
+  let timerInterval = null;
+  let timeLeft = 10;
+  let victoryAnimInterval = null;
+
+  // 8-Frame Dancing Mini Hacker Spritesheet (16x16 pixel art, transparent background, dark hoodie, neon blue trim, glowing eyes)
+  const HACKER_PALETTE = {
+    O: '#060c14', // Dark hoodie outline
+    H: '#101d2e', // Dark navy hoodie base
+    S: '#0a121e', // Hoodie shadow
+    N: '#00f3ff', // Neon blue trim/accents
+    B: '#0088cc', // Mid blue neon shade
+    F: '#04070c', // Deep shadow face under hood
+    E: '#ffffff', // Bright glowing eye core
+    G: '#00ff41'  // Cyber green accent on shoes/belt
+  };
+
+  const HACKER_FRAMES = [
+    // Frame 0: Idle / Groove ready
+    [
+      '.....OOOOOO.....',
+      '....OHHHHHHO....',
+      '...OHHNNNNHHO...',
+      '...OHNFFFFNHO...',
+      '...OHFNEENFHO...',
+      '...OHNFFFFNHO...',
+      '....ONHHHHNO....',
+      '..NN.OHHHHO.NN..',
+      '.N..NOHNNHO.N.N.',
+      '....SOHHHHO.....',
+      '.....OHHHHO.....',
+      '.....OBBBBO.....',
+      '.....OO..OO.....',
+      '....OHH..HHO....',
+      '....OGG..GGO....',
+      '................'
+    ],
+    // Frame 1: Left arm up, knee bend
+    [
+      '................',
+      '.....OOOOOO.....',
+      '.NN.OHHHHHHO....',
+      'N..NOHHNNNNHHO..',
+      '.NN.OHNFFFFNHO..',
+      '....OHFNEENFHO..',
+      '....OHNFFFFNHO..',
+      '.....ONHHHHNO...',
+      '.....OHHHHO.NN..',
+      '.....OHNNHO...N.',
+      '.....OHHHHO.....',
+      '.....OBBBBO.....',
+      '....OO....OO....',
+      '...OHH....HHO...',
+      '...OGG....GGO...',
+      '................'
+    ],
+    // Frame 2: Right arm up, hop
+    [
+      '.....OOOOOO.....',
+      '....OHHHHHHO.NN.',
+      '...OHHNNNNHON..N',
+      '...OHNFFFFNO.NN.',
+      '...OHFNEENFHO...',
+      '...OHNFFFFNHO...',
+      '....ONHHHHNO....',
+      '..NN.OHHHHO.....',
+      '.N...OHNNHO.....',
+      '.....OHHHHO.....',
+      '.....OBBBBO.....',
+      '....OO....OO....',
+      '....OHH..HHO....',
+      '....OGG..GGO....',
+      '................',
+      '................'
+    ],
+    // Frame 3: Both arms pumping up (cyber cheer)
+    [
+      '.NN..OOOOOO..NN.',
+      'N..NOHHHHHHON..N',
+      '.NN.OHHNNNNHO.NN',
+      '....OHNFFFFNHO..',
+      '....OHFNEENFHO..',
+      '....OHNFFFFNHO..',
+      '.....ONHHHHNO...',
+      '.....OHHHHO.....',
+      '.....OHNNHO.....',
+      '.....OHHHHO.....',
+      '.....OBBBBO.....',
+      '....OO....OO....',
+      '...OHH....HHO...',
+      '...OGG....GGO...',
+      '................',
+      '................'
+    ],
+    // Frame 4: Side step left
+    [
+      '....OOOOOO......',
+      '...OHHHHHHO.....',
+      '..OHHNNNNHHO....',
+      '..OHNFFFFNHO....',
+      '..OHFNEENFHO....',
+      '..OHNFFFFNHO....',
+      '...ONHHHHNO.....',
+      '.NN.OHHHHO..NN..',
+      'N...OHNNHO.N..N.',
+      '....OHHHHO......',
+      '....OBBBBO......',
+      '...OO...OO......',
+      '..OHH....HHO....',
+      '..OGG....GGO....',
+      '................',
+      '................'
+    ],
+    // Frame 5: Center dip + neon visor flash
+    [
+      '................',
+      '.....OOOOOO.....',
+      '....OHHHHHHO....',
+      '...OHHNNNNHHO...',
+      '...OHNFFFFNHO...',
+      '...OHFEEENFHO...',
+      '...OHNFFFFNHO...',
+      '....ONHHHHNO....',
+      '..NN.OHHHHO.NN..',
+      '.N..NOHNNHON..N.',
+      '.....OHHHHO.....',
+      '.....OBBBBO.....',
+      '....OO....OO....',
+      '....OHH..HHO....',
+      '....OGG..GGO....',
+      '................'
+    ],
+    // Frame 6: Side step right
+    [
+      '......OOOOOO....',
+      '.....OHHHHHHO...',
+      '....OHHNNNNHHO..',
+      '....OHNFFFFNHO..',
+      '....OHFNEENFHO..',
+      '....OHNFFFFNHO..',
+      '.....ONHHHHNO...',
+      '..NN..OHHHHO.NN.',
+      '.N..N.OHNNHO...N',
+      '......OHHHHO....',
+      '......OBBBBO....',
+      '......OO...OO...',
+      '....OHH....HHO..',
+      '....OGG....GGO..',
+      '................',
+      '................'
+    ],
+    // Frame 7: Victory spin pose
+    [
+      '.....OOOOOO.....',
+      '....OHHHHHHO....',
+      '...OHHNNNNHHO...',
+      '...OHNFFFFNHO...',
+      '...OHFNEENFHO...',
+      '...OHNFFFFNHO...',
+      '....ONHHHHNO....',
+      '.NNNN.OHHHHO.NNN',
+      '.....OHNNHO.....',
+      '.....OHHHHO.....',
+      '.....OBBBBO.....',
+      '.....OO..OO.....',
+      '....OHH..HHO....',
+      '....OGG..GGO....',
+      '................',
+      '................'
+    ]
+  ];
+
+  function renderHackerFrameSVG(frameIndex) {
+    const grid = HACKER_FRAMES[frameIndex % HACKER_FRAMES.length];
+    let rects = '';
+    for (let y = 0; y < 16; y++) {
+      const row = grid[y] || '';
+      for (let x = 0; x < 16; x++) {
+        const ch = row[x];
+        if (ch && ch !== '.' && HACKER_PALETTE[ch]) {
+          rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${HACKER_PALETTE[ch]}"/>`;
+        }
+      }
+    }
+    return `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
+  }
+
+  function stopVictoryAnimation() {
+    if (victoryAnimInterval) {
+      clearInterval(victoryAnimInterval);
+      victoryAnimInterval = null;
+    }
+  }
+
+  function startVictoryAnimation() {
+    stopVictoryAnimation();
+    let frame = 0;
+    const container = document.getElementById('victory-hacker-sprite');
+    if (!container) return;
+    container.innerHTML = renderHackerFrameSVG(0);
+    victoryAnimInterval = setInterval(() => {
+      const el = document.getElementById('victory-hacker-sprite');
+      if (!el) {
+        stopVictoryAnimation();
+        return;
+      }
+      frame = (frame + 1) % HACKER_FRAMES.length;
+      el.innerHTML = renderHackerFrameSVG(frame);
+    }, 140);
+  }
+
+  function updateScoreUI() {
+    document.getElementById('score-alpha').textContent = scores.alpha;
+    document.getElementById('score-bravo').textContent = scores.bravo;
+  }
+
+  function adjustScore(team, delta) {
+    scores[team] = Math.max(0, scores[team] + delta);
+    updateScoreUI();
+    playTone('tick');
+  }
+
+  function toggleEs() {
+    document.body.classList.toggle('show-es');
+    const active = document.body.classList.contains('show-es');
+    const btn = document.getElementById('btn-es');
+    btn.textContent = active ? '🇪🇸 GUÍA ES: ON' : '🇪🇸 GUÍA ES: OFF';
+    btn.classList.toggle('es-active', active);
+  }
+
+  function toggleSound() {
+    soundOn = !soundOn;
+    document.getElementById('btn-sound').textContent = soundOn ? '🔊 SFX: ON' : '🔇 SFX: OFF';
+  }
+
+  function toggleTimer() {
+    timerEnabled = !timerEnabled;
+    document.getElementById('btn-timer').textContent = timerEnabled ? '⏱ TIMER: ON' : '⏱ TIMER: OFF';
+    if (!timerEnabled) {
+      clearInterval(timerInterval);
+      document.getElementById('timer-box').textContent = '--';
+    } else if (document.getElementById('turn-bar').style.display !== 'none' && !answered) {
+      startQuestionTimer();
+    }
+  }
+
+  function startQuestionTimer() {
+    clearInterval(timerInterval);
+    if (!timerEnabled) {
+      document.getElementById('timer-box').textContent = '--';
+      return;
+    }
+    timeLeft = 10;
+    const box = document.getElementById('timer-box');
+    box.textContent = timeLeft + 's';
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      box.textContent = timeLeft + 's';
+      if (timeLeft <= 3 && timeLeft > 0) playTone('tick');
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        box.textContent = "TIME'S UP!";
+        playTone('fail');
+      }
+    }, 1000);
+  }
+
+  function setActiveChip(id) {
+    document.querySelectorAll('.nav-chip').forEach(c => c.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  }
+
+  function highlightActiveTeam(team) {
+    const alphaCard = document.getElementById('card-alpha');
+    const bravoCard = document.getElementById('card-bravo');
+    alphaCard.classList.remove('active-turn');
+    bravoCard.classList.remove('active-turn');
+    if (team === 'alpha') alphaCard.classList.add('active-turn');
+    if (team === 'bravo') bravoCard.classList.add('active-turn');
+  }
+
+  function showStart() {
+    clearInterval(timerInterval);
+    stopVictoryAnimation();
+    document.getElementById('turn-bar').style.display = 'none';
+    highlightActiveTeam(null);
+    setActiveChip('chip-start');
+
+    document.getElementById('arena').innerHTML = `
+      <div class="start-title">PENETRATION TESTING CHALLENGE</div>
+      <div class="start-subtitle">Tecnólogo en Ciberseguridad // S.H.I.E.L.D. vs HYDRA</div>
+      <div class="modules-grid">
+        <div class="module-card">
+          <h3>01 // HACKER OR DEFENDER?</h3>
+          <p>8 Scenarios (4 S.H.I.E.L.D. / 4 HYDRA). Identify malicious hackers vs. authorized pentesters.</p>
+        </div>
+        <div class="module-card">
+          <h3>02 // BLACK, WHITE, OR GREY BOX?</h3>
+          <p>8 Scenarios (4 S.H.I.E.L.D. / 4 HYDRA). Classify the testing method by information access.</p>
+        </div>
+        <div class="module-card">
+          <h3>03 // METHOD OR TOOL?</h3>
+          <p>8 Quick-Fire Items (4 S.H.I.E.L.D. / 4 HYDRA). Distinguish methodologies from tools.</p>
+        </div>
+      </div>
+      <button class="primary-btn" onclick="startRound(0)">INITIALIZE ROUND 1 ▶</button>
+    `;
+  }
+
+  function startRound(rIndex) {
+    stopVictoryAnimation();
+    currentRound = rIndex;
+    currentQ = 0;
+    renderQuestion();
+  }
+
+  function shuffleCurrentRound() {
+    const arr = ROUNDS[currentRound].questions;
+    const alphaPool = [arr[0], arr[2], arr[4], arr[6]].sort(() => Math.random() - 0.5);
+    const bravoPool = [arr[1], arr[3], arr[5], arr[7]].sort(() => Math.random() - 0.5);
+    const rebuilt = [];
+    for (let i = 0; i < 4; i++) {
+      rebuilt.push(alphaPool[i], bravoPool[i]);
+    }
+    ROUNDS[currentRound].questions = rebuilt;
+    if (document.getElementById('turn-bar').style.display !== 'none') {
+      currentQ = 0;
+      renderQuestion();
+    }
+  }
+
+  function renderQuestion() {
+    answered = false;
+    const round = ROUNDS[currentRound];
+    const item = round.questions[currentQ];
+    const turn = getTurnInfo(currentQ);
+
+    document.getElementById('turn-bar').style.display = 'flex';
+    document.getElementById('round-label').textContent = `${round.title} // Q ${currentQ + 1}/8`;
+
+    const badge = document.getElementById('turn-badge');
+    badge.textContent = `TURN: ${turn.label} (${turn.turnNum}/4)`;
+    badge.className = `turn-indicator ${turn.team === 'alpha' ? 'alpha-turn' : 'bravo-turn'}`;
+
+    highlightActiveTeam(turn.team);
+    setActiveChip(`chip-${currentRound}`);
+
+    const optionsHtml = round.options.map(opt => `
+      <button class="option-btn" onclick="checkAnswer('${opt.replace(/'/g, "\\'")}', this)">${opt}</button>
+    `).join('');
+
+    document.getElementById('arena').innerHTML = `
+      <div class="prompt-label">${round.prompt}</div>
+      ${getPixelArtHTML(item.icon)}
+      <div class="question-text">"${item.q}"</div>
+      <div class="es-box">🇪🇸 <strong>Traducción:</strong> ${item.es}</div>
+      <div class="options-grid">${optionsHtml}</div>
+      <div class="feedback-panel" id="feedback"></div>
+    `;
+
+    startQuestionTimer();
+  }
+
+  function checkAnswer(selected, btnEl) {
+    if (answered) return;
+    answered = true;
+    clearInterval(timerInterval);
+
+    const round = ROUNDS[currentRound];
+    const item = round.questions[currentQ];
+    const turn = getTurnInfo(currentQ);
+    const otherTeam = turn.team === 'alpha' ? 'bravo' : 'alpha';
+    const otherLabel = turn.team === 'alpha' ? 'HYDRA' : 'S.H.I.E.L.D.';
+    const isCorrect = (selected === item.answer);
+
+    document.querySelectorAll('.option-btn').forEach(b => {
+      b.disabled = true;
+      if (b.textContent === item.answer) b.classList.add('correct');
+    });
+
+    const fb = document.getElementById('feedback');
+    const isLastQ = (currentQ === round.questions.length - 1);
+    const isLastRound = (currentRound === ROUNDS.length - 1);
+
+    let nextActionHtml = '';
+    if (!isLastQ) {
+      nextActionHtml = `<button class="primary-btn" onclick="nextQuestion()">NEXT QUESTION ▶</button>`;
+    } else if (!isLastRound) {
+      nextActionHtml = `<button class="primary-btn" onclick="startRound(${currentRound + 1})">NEXT ROUND ▶</button>`;
+    } else {
+      nextActionHtml = `<button class="primary-btn" onclick="showFinal()">FINAL RESULTS 🏆</button>`;
+    }
+
+    if (isCorrect) {
+      scores[turn.team] += 1;
+      updateScoreUI();
+      playTone('ok');
+      fb.className = 'feedback-panel granted';
+      fb.innerHTML = `
+        <div class="feedback-status">✔ ACCESS GRANTED — +1 POINT TO ${turn.label}!</div>
+        <div class="feedback-exp">${item.exp}</div>
+        <div class="es-box" style="margin: 0 auto 12px;">🇪🇸 ${item.expEs}</div>
+        <div class="action-row">${nextActionHtml}</div>
+      `;
+    } else {
+      btnEl.classList.add('wrong');
+      playTone('fail');
+      fb.className = 'feedback-panel denied';
+      fb.innerHTML = `
+        <div class="feedback-status">✖ ACCESS DENIED — Correct Answer: ${item.answer}</div>
+        <div class="feedback-exp">${item.exp}</div>
+        <div class="es-box" style="margin: 0 auto 12px;">🇪🇸 ${item.expEs}</div>
+        <div class="action-row">
+          <button class="steal-btn" id="steal-btn" onclick="awardSteal('${otherTeam}', '${otherLabel}')">+1 STEAL TO ${otherLabel}</button>
+          ${nextActionHtml}
+        </div>
+      `;
+    }
+  }
+
+  function awardSteal(team, label) {
+    scores[team] += 1;
+    updateScoreUI();
+    playTone('ok');
+    const sb = document.getElementById('steal-btn');
+    if (sb) {
+      sb.disabled = true;
+      sb.textContent = `✔ +1 AWARDED TO ${label}`;
+    }
+  }
+
+  function nextQuestion() {
+    currentQ++;
+    renderQuestion();
+  }
+
+  function showFinal() {
+    clearInterval(timerInterval);
+    stopVictoryAnimation();
+    document.getElementById('turn-bar').style.display = 'none';
+    highlightActiveTeam(null);
+    setActiveChip('chip-end');
+
+    let winnerText = "IT'S A TIE!";
+    let winnerColor = "var(--border-neon)";
+    if (scores.alpha > scores.bravo) {
+      winnerText = "🏆 S.H.I.E.L.D. WINS!";
+      winnerColor = "var(--cyan-neon)";
+    } else if (scores.bravo > scores.alpha) {
+      winnerText = "🏆 HYDRA WINS!";
+      winnerColor = "var(--red-alert)";
+    }
+
+    document.getElementById('arena').innerHTML = `
+      <div class="prompt-label">MISSION COMPLETE // TECNÓLOGO EN CIBERSEGURIDAD</div>
+      <div class="start-title" style="color:${winnerColor}; font-size:2.8rem;">${winnerText}</div>
+      <div class="victory-hacker-stage" aria-label="Dancing pixel art hacker">
+        <div class="victory-hacker-sprite" id="victory-hacker-sprite"></div>
+        <div class="victory-hacker-shadow"></div>
+      </div>
+      <div class="start-subtitle" style="font-size:1.4rem; margin-bottom:24px;">
+        S.H.I.E.L.D.: <strong>${scores.alpha}</strong> &nbsp;|&nbsp; HYDRA: <strong>${scores.bravo}</strong>
+      </div>
+      <div class="module-card" style="max-width:760px; text-align:center; margin-bottom:28px;">
+        <h3 style="font-size:1.1rem; margin-bottom:10px;">GOLDEN RULE OF PENETRATION TESTING</h3>
+        <p style="font-size:1rem; color:var(--text-main);">
+          "Do we need permission before a penetration test?" — <strong>YES, ALWAYS!</strong><br>
+          <span style="color:var(--border-neon);">Permission • Clear Plan • Right Method • Useful Report</span>
+        </p>
+      </div>
+      <button class="primary-btn" onclick="resetAll()">PLAY AGAIN ↻</button>
+    `;
+
+    startVictoryAnimation();
+  }
+
+  function resetAll() {
+    stopVictoryAnimation();
+    scores = { alpha: 0, bravo: 0 };
+    updateScoreUI();
+    showStart();
+  }
+
+  window.onload = function () {
+    startMatrix();
+    showStart();
+  };
+</script>
+</body>
+</html>
